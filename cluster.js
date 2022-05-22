@@ -4,14 +4,20 @@ const cluster = require("cluster");
 const numCPUs = require("os").cpus().length;
 const { setupWorker, setupMaster } = require("@socket.io/sticky");
 const { createAdapter, setupPrimary } = require("@socket.io/cluster-adapter");
+const redis = require("@socket.io/redis-adapter");
+const { createClient } = require("redis");
 
 const entryPoint = require("./index");
+const config = require("./config");
 
 // CONSTANTS
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = config.server.PORT;
+const REDIS_URL = config.redis.URL;
+const pubClient = createClient({ url: REDIS_URL });
+const subClient = pubClient.duplicate();
 
 // Connect any DB...
 
@@ -37,7 +43,7 @@ const PORT = process.env.PORT || 5000;
       serialization: "advanced",
     });
 
-    server.listen(PORT);
+    //server.listen(PORT);
 
     for (let i = 0; i < numCPUs; i++) {
       cluster.fork();
@@ -59,12 +65,18 @@ const PORT = process.env.PORT || 5000;
     const io = require("socket.io")(server);
 
     // use the cluster adapter
+
     io.adapter(createAdapter());
 
     // setup connection with the primary process
     setupWorker(io);
 
     // Wrap index.js
-    entryPoint.call({ io });
+
+    Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+      io.adapter(redis.createAdapter(pubClient, subClient));
+      entryPoint.call({ io });
+      io.listen(PORT);
+    });
   }
 })();

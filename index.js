@@ -1,7 +1,7 @@
 const virtualSpaceHandler = require("./controllers/virtual-space");
 
 module.exports = function () {
-  io = this.io;
+  const io = this.io;
 
   // Namespaces..
 
