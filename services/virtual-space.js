@@ -14,17 +14,30 @@ class VirtualSpace {
     this._description = description || "";
     this._time_limit = time_limit || 30;
     this._attendant_limit = attendant_limit || 5;
-    this._vs = vs || null; // Namespace with room
-    this._socket = socket || null;
   }
 
   // Getters and Setters
+
+  get name() {
+    return this._name;
+  }
+
+  set name(name) {
+    this._name = name;
+  }
 
   async join() {}
   async kick(user_id) {}
   async leave() {}
   async fetch() {}
   async delete() {}
+  async create() {}
+
+  get() {
+    return {
+      name: this._name,
+    };
+  }
 }
 
 module.exports = VirtualSpace;
