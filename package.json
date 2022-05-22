@@ -1,0 +1,19 @@
+{
+  "name": "syncviz-backend",
+  "version": "1.0.0",
+  "description": "3D file sharing app",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon cross-env NODE_ENV=development cluster.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Karl-Johan",
+  "license": "ISC",
+  "dependencies": {
+    "@socket.io/cluster-adapter": "^0.2.0",
+    "@socket.io/sticky": "^1.0.1",
+    "cross-env": "^7.0.3",
+    "express": "^4.18.1",
+    "socket.io": "^4.5.1"
+  }
+}
