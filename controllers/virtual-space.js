@@ -2,45 +2,64 @@ const VS = require("../services/virtual-space");
 const wrapper = require("../middlewares/wrapper");
 const constants = require("../constants");
 const config = require("../config");
+const VirtualSpace = require("../services/virtual-space");
+const authenticate = require("../middlewares/authenticate");
 
 module.exports = virtualSpaceHandler = async (io) => {
  const NameSpace = io.of(constants.namespaces.VIRTUAL_SPACE);
 
- NameSpace.use(
-  wrapper((req, res, next) => {
-   // Any middleware..
-   req.example = { message: "Hello World" }; // EXAMPLE
-   next();
-  })
- );
+ NameSpace.use(wrapper(authenticate));
 
  NameSpace.on("connection", async (socket) => {
-  const VirtualSpace = new VS({ vs: NameSpace });
-  const example = socket.request.example; // EXAMPLE
+  const VirtualSpace = new VS({});
+  const User = socket.request.user;
   // Actions when user connects to ns
 
+  User.socket_id = socket.id;
+  VirtualSpace.socket = socket;
+  VirtualSpace.attendee = User;
+
   if (socket.handshake.query.vs_id) {
-   // Connect to Virtual Space
+   VirtualSpace.id = socket.handshake.query.vs_id;
+   VirtualSpace.vs = NameSpace.to(VirtualSpace.id);
+   VirtualSpace.join({ id: socket.handshake.query.vs_id });
   } else {
-   // Events avaliable to users not connected to a vs
-   socket.on("create", await createVirtualSpace({ socket, VirtualSpace }));
-   socket.on("info", updateVirtualSpace({ socket, VirtualSpace, NameSpace }));
-   socket.on("disconnect", () => {});
+   VirtualSpace.creator_id = User.socket_id;
+   VirtualSpace.create();
+   VirtualSpace.vs = NameSpace.to(VirtualSpace.id);
   }
+
+  // Initialize chatroom
+
+  VirtualSpace.initializeChat();
+
+  // Events avaliable to users not connected to a vs
+
+  socket.on("info", getVirtualSpace(VirtualSpace));
+  socket.on("disconnect", leaveVirtualSpace(VirtualSpace));
+  socket.on("send-message", sendMessageToChat(VirtualSpace));
+  socket.on("kick", kickUserFromVirtualSpace(VirtualSpace));
  });
 };
 
 // Using functions so that the use of call and bind can be considered
 
-async function createVirtualSpace({ socket, VirtualSpace }) {
- return async ({ name }) => {
-  VirtualSpace.name = name;
-  await VirtualSpace.create();
- };
+function getVirtualSpace(VirtualSpace) {
+ return async (args) => VirtualSpace.fetch();
 }
 
-function updateVirtualSpace({ socket, VirtualSpace, NameSpace }) {
- return (args) => {
-  NameSpace.emit("updates", VirtualSpace.get());
- };
+function leaveVirtualSpace(VirtualSpace) {
+ return (args) => VirtualSpace.leave();
+}
+
+function sendMessageToChat(VirtualSpace) {
+ const Message = require("../services/message");
+ return (args) =>
+  VirtualSpace.chat.add(
+   new Message(args.message, { sender: VirtualSpace.attendee })
+  );
+}
+
+function kickUserFromVirtualSpace(VirtualSpace) {
+ return ({ user_id }) => VirtualSpace.kick(user_id);
 }
