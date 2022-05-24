@@ -1,5 +1,5 @@
 require("dotenv-flow").config({
-  silent: true,
+ silent: true,
 });
 
 /*
@@ -10,17 +10,23 @@ require("dotenv-flow").config({
 
 const ENV = process.env;
 const variables = {
-  environment: {
-    NODE_ENV: ENV.NODE_ENV || "development",
-  },
+ environment: {
+  NODE_ENV: ENV.NODE_ENV || "development",
+ },
 
-  server: {
-    PORT: ENV.PORT || 5000,
-  },
+ server: {
+  PORT: ENV.PORT || 5000,
+ },
 
-  redis: {
-    URL: ENV.REDIS_URL || "redis://localhost:6379",
-  },
+ redis: {
+  URL: ENV.REDIS_URL || "redis://localhost:6379",
+ },
+
+ db: {
+  URI: ENV.DB_URI || "",
+  USER: ENV.DB_USER || "",
+  PASSWORD: ENV.DB_PASSWORD || "",
+ },
 };
 
 module.exports = variables;

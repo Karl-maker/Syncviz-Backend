@@ -1,5 +1,7 @@
 const User = require("./user");
 const Chat = require("./chat");
+const VirtualSpaceModel = require("../models/virtual-space");
+const schedule = require("node-schedule");
 
 class VirtualSpace {
  constructor({
@@ -95,34 +97,63 @@ class VirtualSpace {
   this._chat = chat;
  }
 
- async join({ id }) {
+ async join(id) {
+  // return message
   // Do database actions first..
+  let virtual_space = {};
 
-  this._socket.join(id || this._id);
-  this._socket.emit("updates", { message: "Joined virtual space" });
-  this._socket.broadcast.to(this._id).emit("updates", {
-   message: `${this._attendee.username || "guest"} has joined`,
-  });
+  try {
+   virtual_space = await VirtualSpaceModel.findOne({ _id: id });
+  } catch (err) {
+   throw err;
+  }
+
+  // Check if exists
+
+  if (!virtual_space) {
+   throw { name: "NotFound", message: "Virtual space isn't found" };
+  }
+
+  if (virtual_space.current_amount_attending < virtual_space.attendant_limit) {
+   // Socket operations
+   this._id = id;
+   this._name = virtual_space.name;
+   this._description = virtual_space.description;
+   this._time_limit = virtual_space.time_limit;
+
+   this._socket.join(id);
+
+   virtual_space = await VirtualSpaceModel.findOneAndUpdate(
+    { _id: id },
+    { $inc: { current_amount_attending: 1 } },
+    { new: true }
+   );
+
+   // Initialize Chat
+
+   this.initializeChat();
+
+   return { message: "Joined Virtual Space", virtual_space };
+  } else {
+   throw { name: "Forbidden", message: "Virtual Space is full" };
+  }
  }
 
- async kick(user_id) {
-  this._vs.emit("updates", { action: "Kick", user_id });
- }
+ async kick(user_id) {}
 
  async leave() {
-  if (this._creator_id === this._attendee.socket_id) {
-   // Creator has left...
+  await VirtualSpaceModel.findOneAndUpdate(
+   { _id: this._id },
+   { $inc: { current_amount_attending: -1 } }
+  );
+  this._socket.leave(this._id);
+ }
 
-   this._socket.broadcast.to(this._id).emit("updates", {
-    message: `Virtual space has ended`,
-   });
-
-   // Clear room
-   this._vs.disconnectSockets();
-  } else {
-   this._socket.broadcast.to(this._id).emit("updates", {
-    message: `${this._attendee.username || "guest"} has left`,
-   });
+ async end() {
+  try {
+   await VirtualSpaceModel.findOneAndDelete({ _id: this._id });
+  } catch (err) {
+   throw { err };
   }
  }
 
@@ -139,18 +170,76 @@ class VirtualSpace {
   this._vs.disconnectSockets();
  }
 
- async create() {
+ async create({ creator_id, name, description }) {
   // Creation Logic
-  this._id = "123";
-  this.join({ id: this._id });
+  try {
+   let virtual_space = await VirtualSpaceModel.create({
+    host: creator_id,
+    name,
+    description,
+   });
+
+   this._name = virtual_space.name;
+   this._description = virtual_space.description;
+   this._creator_id = creator_id;
+   this._time_limit = virtual_space.time_limit;
+
+   return {
+    message: "Virtual Space created",
+    virtual_space: virtual_space,
+   };
+  } catch (err) {
+   throw err;
+  }
  }
 
- async initializeChat() {
+ initializeChat() {
   this._chat = new Chat({
-   vs: this._vs,
    vs_id: this._id,
    socket: this._socket,
   });
+ }
+
+ async time(room) {
+  // shedule an end where they all disconnect
+  let i = 0;
+  const timer = setInterval(() => {
+   i++;
+   trackTimer(i);
+  }, 60000);
+
+  const trackTimer = (minutes) => {
+   if (minutes < this._time_limit) {
+    // running
+    room.emit("timer", {
+     time_left: `${this._time_limit - minutes} ${
+      this._time_limit - minutes === 1 ? "minute" : "minutes"
+     }`,
+    });
+   }
+
+   if (minutes >= this._time_limit) {
+    // finished
+
+    this.end()
+     .then(() =>
+      room.emit("alerts", {
+       message: `Virtual space has closed`,
+      })
+     )
+     .then(() => {
+      clearInterval(timer);
+      room.disconnectSockets();
+     })
+     .catch((err) => {
+      throw err;
+     });
+   }
+
+   if (this._time_limit - minutes === 1) {
+    room.emit("timer", { prompt: "Meeting will end in 1 minute" });
+   }
+  };
  }
 }
 
