@@ -8,6 +8,10 @@ class Chat {
  add(message) {
   this._socket.broadcast.to(this._vs_id).emit("messages", message.get());
  }
+
+ direct(message, socket_id) {
+  this._socket.broadcast.to(socket_id).emit("messages", message.get());
+ }
 }
 
 module.exports = Chat;

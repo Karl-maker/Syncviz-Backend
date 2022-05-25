@@ -21,13 +21,19 @@ module.exports = virtualSpaceHandler = async (io) => {
   VirtualSpace.socket = socket;
   VirtualSpace.attendee = User;
 
+  // Return current user data
+
+  socket.emit("me", VirtualSpace.attendee.get());
+
   // Events avaliable to users not connected to a vs
 
   socket.on("join", joinVirtualSpace);
   socket.on("create", createVirtualSpace);
   socket.on("disconnect", leaveVirtualSpace);
   socket.on("send-message", sendMessageToChat);
-  socket.on("upload-3d", transfer3DFile);
+  socket.on("send-direct-message", sendDirectMessage);
+  socket.on("share-blob", shareBlob);
+  socket.on("share-direct-blob", sendBlob);
   socket.on("speak", transferAudio);
 
   // Methods
@@ -40,10 +46,11 @@ module.exports = virtualSpaceHandler = async (io) => {
   2. alerts - major alerts
   3. messages - messages
   4. live-audios - live audio data
-  5. 3d-files - 3D data
-  6. viewers - viewers attending virtual space *
+  5. blobs - blob data (imgs, 3d, video)
+  6. viewers - viewers attending virtual space 
   7. attributes - virtual space attributes
   8. timer - time limit
+  9. me - my data
 
   Example Code:
 
@@ -59,8 +66,23 @@ module.exports = virtualSpaceHandler = async (io) => {
 
   */
 
-  function transfer3DFile(file) {
-   socket.broadcast.to(VirtualSpace.id).emit("3d-files", file);
+  function sendBlob({ id }) {
+   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+    ({ users }) => {
+     // check if in viewers list
+
+     users.filter(function (client) {
+      if (client.id === user_id) {
+       socket.broadcast.to(id).emit("blobs", VirtualSpace.blob.data);
+      }
+     });
+    }
+   );
+  }
+
+  function shareBlob(file) {
+   VirtualSpace.blob.data = file;
+   socket.broadcast.to(VirtualSpace.id).emit("blobs", file);
   }
 
   function transferAudio(audio) {
@@ -152,6 +174,25 @@ module.exports = virtualSpaceHandler = async (io) => {
      })
      .catch((err) => errorHandler(err, socket));
    }
+  }
+
+  function sendDirectMessage({ user_id, message }) {
+   const Message = require("../services/message");
+
+   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+    ({ users }) => {
+     // check if in viewers list
+
+     users.filter(function (client) {
+      if (client.id === user_id) {
+       VirtualSpace.chat.direct(
+        new Message(message, { sender: VirtualSpace.attendee, private: true }),
+        user_id
+       );
+      }
+     });
+    }
+   );
   }
 
   function sendMessageToChat({ message }) {

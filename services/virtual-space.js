@@ -2,6 +2,7 @@ const User = require("./user");
 const Chat = require("./chat");
 const { fetchSocketOrganizer } = require("../utils/socket");
 const VirtualSpaceModel = require("../models/virtual-space");
+const Blob = require("./blob");
 const schedule = require("node-schedule");
 
 class VirtualSpace {
@@ -24,6 +25,7 @@ class VirtualSpace {
   this._creator_id = "";
   this._attendee = attendee || new User({});
   this._chat = null;
+  this._blob = new Blob({});
  }
 
  // Getters and Setters
@@ -90,6 +92,14 @@ class VirtualSpace {
 
  set chat(chat) {
   this._chat = chat;
+ }
+
+ get blob() {
+  return this._blob;
+ }
+
+ set blob(blob) {
+  this._blob = blob;
  }
 
  async join(id) {

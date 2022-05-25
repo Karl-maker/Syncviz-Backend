@@ -8,7 +8,7 @@ const VirtualSpaceSchema = new mongoose.Schema(
   description: { type: String, default: "" },
   host: { type: String, required: true },
   time_limit: { type: Number, default: 30 },
-  attendant_limit: { type: Number, default: 5 },
+  attendant_limit: { type: Number, default: 10 },
   // Mutable
   current_amount_attending: { type: Number, default: 0 },
   private: { type: Boolean, default: 0 },
