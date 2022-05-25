@@ -17,6 +17,7 @@ module.exports = virtualSpaceHandler = async (io) => {
   // Actions when user connects to ns
 
   User.socket_id = socket.id;
+  socket.username = User.username;
   VirtualSpace.socket = socket;
   VirtualSpace.attendee = User;
 
@@ -26,16 +27,61 @@ module.exports = virtualSpaceHandler = async (io) => {
   socket.on("create", createVirtualSpace);
   socket.on("disconnect", leaveVirtualSpace);
   socket.on("send-message", sendMessageToChat);
+  socket.on("upload-3d", transfer3DFile);
+  socket.on("speak", transferAudio);
 
   // Methods
 
-  function joinVirtualSpace({ virtual_space_id }) {
+  /*
+
+  Listeners
+
+  1. updates - general updates e.g. when users join
+  2. alerts - major alerts
+  3. messages - messages
+  4. live-audios - live audio data
+  5. 3d-files - 3D data
+  6. viewers - viewers attending virtual space *
+  7. attributes - virtual space attributes
+  8. timer - time limit
+
+  Example Code:
+
+  NameSpace.to(virtual_space_id).emit("viewers", {
+      viewer: VirtualSpace.attendee,
+  });
+
+  socket.emit("updates", { message, virtual_space });
+
+  socket.broadcast.to(virtual_space_id).emit("updates", {
+    message: `guest has joined`,
+  });
+
+  */
+
+  function transfer3DFile(file) {
+   socket.broadcast.to(VirtualSpace.id).emit("3d-files", file);
+  }
+
+  function transferAudio(audio) {
+   socket.broadcast.to(VirtualSpace.id).emit("live-audios", audio);
+  }
+
+  function joinVirtualSpace() {
+   virtual_space_id = socket.handshake.query.virtual_space_id;
+
    VirtualSpace.join(virtual_space_id)
     .then(({ message, virtual_space }) => {
-     socket.emit("updates", { message, virtual_space });
+     VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+      (viewers) => {
+       NameSpace.to(VirtualSpace._id).emit("viewers", viewers);
+      }
+     );
 
+     socket.emit("updates", { message });
+     socket.emit("attributes", { virtual_space });
      socket.broadcast.to(virtual_space_id).emit("updates", {
-      message: `guest has joined`,
+      message: `${VirtualSpace.attendee.username} has joined`,
      });
     })
     .catch((err) => {
@@ -46,13 +92,20 @@ module.exports = virtualSpaceHandler = async (io) => {
   function createVirtualSpace({ name, description }) {
    VirtualSpace.create({ creator_id: socket.id, name, description })
     .then(({ message, virtual_space }) => {
-     socket.emit("updates", { message, virtual_space });
+     socket.emit("updates", { message });
      return { virtual_space };
     })
     .then(({ virtual_space }) => {
      return VirtualSpace.join(virtual_space._id.toString())
       .then(({ message, virtual_space }) => {
-       socket.emit("updates", { message, virtual_space });
+       VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+        (viewers) => {
+         NameSpace.to(VirtualSpace._id).emit("viewers", viewers);
+        }
+       );
+
+       socket.emit("updates", { message });
+       socket.emit("attributes", { virtual_space });
        return { virtual_space };
       })
       .catch((err) => {
@@ -85,10 +138,16 @@ module.exports = virtualSpaceHandler = async (io) => {
      })
      .catch((err) => errorHandler(err, socket));
    } else {
+    VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+     (viewers) => {
+      NameSpace.to(VirtualSpace._id).emit("viewers", viewers);
+     }
+    );
+
     VirtualSpace.leave()
      .then(() => {
       socket.broadcast.to(VirtualSpace.id).emit("updates", {
-       message: `guest ${VirtualSpace.attendee.socket_id} has left`,
+       message: `${VirtualSpace.attendee.username} has left`,
       });
      })
      .catch((err) => errorHandler(err, socket));

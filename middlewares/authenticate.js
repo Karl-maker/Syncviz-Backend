@@ -1,7 +1,15 @@
 const User = require("../services/user");
 
 module.exports = (req, res, next) => {
- req.user = new User({});
+ let auth;
+
+ try {
+  auth = JSON.parse(req.headers.authorization || '{"username": ""}'.toString());
+ } catch (err) {
+  console.log(err);
+ }
+
+ req.user = new User({ username: auth.username || "" });
 
  next();
 };

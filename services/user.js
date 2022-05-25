@@ -15,11 +15,19 @@ class User {
  }
 
  get username() {
-  return this._username;
+  return this._username || `guest ${this._socket_id}`;
  }
 
  set username(username) {
   this._username = username;
+ }
+
+ get() {
+  return {
+   id: this._socket_id,
+   username: this.username,
+   color: this._color,
+  };
  }
 }
 

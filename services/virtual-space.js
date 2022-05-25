@@ -1,5 +1,6 @@
 const User = require("./user");
 const Chat = require("./chat");
+const { fetchSocketOrganizer } = require("../utils/socket");
 const VirtualSpaceModel = require("../models/virtual-space");
 const schedule = require("node-schedule");
 
@@ -49,9 +50,6 @@ class VirtualSpace {
 
  set name(name) {
   this._name = name;
-  this._socket.broadcast.to(this._id).emit("updates", {
-   message: `Virtual space name has changed to ${this._name}`,
-  });
  }
 
  get description() {
@@ -60,9 +58,6 @@ class VirtualSpace {
 
  set description(description) {
   this._description = description;
-  this._socket.broadcast.to(this._id).emit("updates", {
-   message: `Virtual space description has changed to ${this._description}`,
-  });
  }
 
  get vs() {
@@ -141,6 +136,11 @@ class VirtualSpace {
 
  async kick(user_id) {}
 
+ async getSocketClients(room) {
+  let result = fetchSocketOrganizer(await room.fetchSockets());
+  return result;
+ }
+
  async leave() {
   await VirtualSpaceModel.findOneAndUpdate(
    { _id: this._id },
@@ -158,7 +158,7 @@ class VirtualSpace {
  }
 
  async fetch() {
-  this._socket.emit("virtual-space", {
+  this._socket.emit("attributes", {
    id: this._id,
    name: this._name,
    description: this._description,
