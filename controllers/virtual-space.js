@@ -44,7 +44,7 @@ module.exports = virtualSpaceHandler = async (io) => {
 
   1. updates - general updates e.g. when users join
   2. alerts - major alerts
-  3. messages - messages
+  3. messages / private-messages - messages
   4. live-audios - live audio data
   5. blobs - blob data (imgs, 3d, video)
   6. viewers - viewers attending virtual space 
@@ -66,14 +66,14 @@ module.exports = virtualSpaceHandler = async (io) => {
 
   */
 
-  function sendBlob({ id }) {
+  function sendBlob({ user_id }) {
    VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
     ({ users }) => {
      // check if in viewers list
 
      users.filter(function (client) {
       if (client.id === user_id) {
-       socket.broadcast.to(id).emit("blobs", VirtualSpace.blob.data);
+       socket.broadcast.to(user_id).emit("blobs", VirtualSpace.blob.data);
       }
      });
     }
@@ -82,7 +82,7 @@ module.exports = virtualSpaceHandler = async (io) => {
 
   function shareBlob(file) {
    VirtualSpace.blob.data = file;
-   socket.broadcast.to(VirtualSpace.id).emit("blobs", file);
+   socket.broadcast.to(VirtualSpace.id).emit("blobs", VirtualSpace.blob.data);
   }
 
   function transferAudio(audio) {
@@ -186,7 +186,7 @@ module.exports = virtualSpaceHandler = async (io) => {
      users.filter(function (client) {
       if (client.id === user_id) {
        VirtualSpace.chat.direct(
-        new Message(message, { sender: VirtualSpace.attendee, private: true }),
+        new Message(message, { sender: VirtualSpace.attendee }),
         user_id
        );
       }

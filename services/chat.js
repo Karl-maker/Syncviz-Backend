@@ -10,7 +10,7 @@ class Chat {
  }
 
  direct(message, socket_id) {
-  this._socket.broadcast.to(socket_id).emit("messages", message.get());
+  this._socket.broadcast.to(socket_id).emit("private-messages", message.get());
  }
 }
 

@@ -4,7 +4,7 @@ class Blob {
  }
 
  get data() {
-  this._data;
+  return this._data;
  }
 
  set data(data) {
