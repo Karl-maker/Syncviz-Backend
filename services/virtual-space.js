@@ -4,6 +4,7 @@ const { fetchSocketOrganizer } = require("../utils/socket");
 const VirtualSpaceModel = require("../models/virtual-space");
 const Blob = require("./blob");
 const schedule = require("node-schedule");
+const constants = require("../constants");
 
 class VirtualSpace {
  constructor({
@@ -26,6 +27,8 @@ class VirtualSpace {
   this._attendee = attendee || new User({});
   this._chat = null;
   this._blob = new Blob({});
+  this._master = false;
+  this._io = null;
  }
 
  // Getters and Setters
@@ -102,6 +105,22 @@ class VirtualSpace {
   this._blob = blob;
  }
 
+ get master() {
+  return this._master;
+ }
+
+ set master(master) {
+  this._master = master;
+ }
+
+ get io() {
+  return this._io;
+ }
+
+ set io(io) {
+  this._io = io;
+ }
+
  async join(id) {
   // return message
   // Do database actions first..
@@ -125,6 +144,7 @@ class VirtualSpace {
    this._name = virtual_space.name;
    this._description = virtual_space.description;
    this._time_limit = virtual_space.time_limit;
+   this._creator_id == virtual_space.host;
 
    this._socket.join(id);
 
@@ -193,6 +213,7 @@ class VirtualSpace {
    this._description = virtual_space.description;
    this._creator_id = creator_id;
    this._time_limit = virtual_space.time_limit;
+   this._master = true;
 
    return {
     message: "Virtual Space created",
@@ -240,6 +261,7 @@ class VirtualSpace {
      .then(() => {
       clearInterval(timer);
       room.disconnectSockets();
+      this._socket.disconnect(true);
      })
      .catch((err) => {
       throw err;

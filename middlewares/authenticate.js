@@ -4,7 +4,7 @@ module.exports = (req, res, next) => {
  let auth;
 
  try {
-  auth = JSON.parse(req.headers.authorization || '{"username": ""}'.toString());
+  auth = JSON.parse(req.headers.authorization || '{"username": ""}');
  } catch (err) {
   console.log(err);
  }

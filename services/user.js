@@ -24,7 +24,8 @@ class User {
 
  get() {
   return {
-   id: this._socket_id,
+   id: this._id,
+   socket_id: this._socket_id,
    username: this.username,
    color: this._color,
   };

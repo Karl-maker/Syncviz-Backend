@@ -14,6 +14,7 @@ module.exports = virtualSpaceHandler = async (io) => {
  NameSpace.on("connection", async (socket) => {
   const VirtualSpace = new VS({});
   const User = socket.request.user;
+
   // Actions when user connects to ns
 
   User.socket_id = socket.id;
@@ -23,20 +24,19 @@ module.exports = virtualSpaceHandler = async (io) => {
 
   // Return current user data
 
-  socket.emit("me", VirtualSpace.attendee.get());
+  socket.emit("current-user", VirtualSpace.attendee.get());
 
   // Events avaliable to users not connected to a vs
 
   socket.on("join", joinVirtualSpace);
   socket.on("create", createVirtualSpace);
   socket.on("disconnect", leaveVirtualSpace);
+  socket.on("delete", endVirtualSpace);
   socket.on("send-message", sendMessageToChat);
   socket.on("send-direct-message", sendDirectMessage);
-  socket.on("share-blob", shareBlob);
-  socket.on("share-direct-blob", sendBlob);
-  socket.on("speak", transferAudio);
-
-  // Methods
+  socket.on("send-blob", sendDirectBlob);
+  socket.on("send-direct-blob", sendBlob);
+  socket.on("speak", sendAudio);
 
   /*
 
@@ -52,40 +52,9 @@ module.exports = virtualSpaceHandler = async (io) => {
   8. timer - time limit
   9. me - my data
 
-  Example Code:
-
-  NameSpace.to(virtual_space_id).emit("viewers", {
-      viewer: VirtualSpace.attendee,
-  });
-
-  socket.emit("updates", { message, virtual_space });
-
-  socket.broadcast.to(virtual_space_id).emit("updates", {
-    message: `guest has joined`,
-  });
-
   */
 
-  function sendBlob({ user_id }) {
-   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
-    ({ users }) => {
-     // check if in viewers list
-
-     users.filter(function (client) {
-      if (client.id === user_id) {
-       socket.broadcast.to(user_id).emit("blobs", VirtualSpace.blob.data);
-      }
-     });
-    }
-   );
-  }
-
-  function shareBlob(file) {
-   VirtualSpace.blob.data = file;
-   socket.broadcast.to(VirtualSpace.id).emit("blobs", VirtualSpace.blob.data);
-  }
-
-  function transferAudio(audio) {
+  function sendAudio(audio) {
    socket.broadcast.to(VirtualSpace.id).emit("live-audios", audio);
   }
 
@@ -94,19 +63,24 @@ module.exports = virtualSpaceHandler = async (io) => {
 
    VirtualSpace.join(virtual_space_id)
     .then(({ message, virtual_space }) => {
+     // Notify current attendees of updated viewer list
      VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
       (viewers) => {
        NameSpace.to(VirtualSpace._id).emit("viewers", viewers);
       }
      );
 
-     socket.emit("updates", { message });
+     // Send new attendee the current attributes of meeting
      socket.emit("attributes", { virtual_space });
-     socket.broadcast.to(virtual_space_id).emit("updates", {
+
+     // Notify current attendees who has joined
+     NameSpace.to(VirtualSpace.id).emit("updates", {
       message: `${VirtualSpace.attendee.username} has joined`,
      });
     })
     .catch((err) => {
+     // Disconnect socket
+     socket.disconnect(true);
      errorHandler(err, socket);
     });
   }
@@ -114,10 +88,12 @@ module.exports = virtualSpaceHandler = async (io) => {
   function createVirtualSpace({ name, description }) {
    VirtualSpace.create({ creator_id: socket.id, name, description })
     .then(({ message, virtual_space }) => {
-     socket.emit("updates", { message });
+     // Prompt creator
+     socket.emit("alerts", { message });
      return { virtual_space };
     })
     .then(({ virtual_space }) => {
+     // Join and Get current viewer's list which should only be the creator
      return VirtualSpace.join(virtual_space._id.toString())
       .then(({ message, virtual_space }) => {
        VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
@@ -126,7 +102,7 @@ module.exports = virtualSpaceHandler = async (io) => {
         }
        );
 
-       socket.emit("updates", { message });
+       // Send new attendee the current attributes of meeting
        socket.emit("attributes", { virtual_space });
        return { virtual_space };
       })
@@ -135,6 +111,7 @@ module.exports = virtualSpaceHandler = async (io) => {
       });
     })
     .then(({ virtual_space }) => {
+     // Start timer
      VirtualSpace.time(NameSpace.to(virtual_space._id.toString()))
       .then(() => {})
       .catch((err) => errorHandler(err, socket));
@@ -144,11 +121,8 @@ module.exports = virtualSpaceHandler = async (io) => {
     });
   }
 
-  function leaveVirtualSpace() {
-   if (socket.id === VirtualSpace.creator_id) {
-    // Creator has left...
-    // Clear room
-
+  function endVirtualSpace() {
+   if (User.socket_id === VirtualSpace.creator_id) {
     VirtualSpace.end()
      .then(() =>
       NameSpace.to(VirtualSpace._id).emit("alerts", {
@@ -159,21 +133,27 @@ module.exports = virtualSpaceHandler = async (io) => {
       NameSpace.to(VirtualSpace._id).disconnectSockets();
      })
      .catch((err) => errorHandler(err, socket));
-   } else {
-    VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
-     (viewers) => {
-      NameSpace.to(VirtualSpace._id).emit("viewers", viewers);
-     }
-    );
-
-    VirtualSpace.leave()
-     .then(() => {
-      socket.broadcast.to(VirtualSpace.id).emit("updates", {
-       message: `${VirtualSpace.attendee.username} has left`,
-      });
-     })
-     .catch((err) => errorHandler(err, socket));
    }
+  }
+
+  function leaveVirtualSpace() {
+   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+    (viewers) => {
+     NameSpace.to(VirtualSpace._id).emit("viewers", viewers);
+    }
+   );
+
+   VirtualSpace.leave()
+    .then(() => {
+     socket.broadcast.to(VirtualSpace.id).emit("updates", {
+      message: `${VirtualSpace.attendee.username} has left`,
+     });
+     if (socket.id !== VirtualSpace.creator_id) {
+      socket.disconnect(true);
+     }
+    })
+    .catch((err) => errorHandler(err, socket));
+   //}
   }
 
   function sendDirectMessage({ user_id, message }) {
@@ -203,3 +183,22 @@ module.exports = virtualSpaceHandler = async (io) => {
   }
  });
 };
+
+function sendBlob({ user_id }) {
+ VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+  ({ users }) => {
+   // check if in viewers list
+
+   users.filter(function (client) {
+    if (client.id === user_id) {
+     socket.broadcast.to(user_id).emit("blobs", VirtualSpace.blob.data);
+    }
+   });
+  }
+ );
+}
+
+function sendDirectBlob(file) {
+ VirtualSpace.blob.data = file;
+ socket.broadcast.to(VirtualSpace.id).emit("blobs", VirtualSpace.blob.data);
+}

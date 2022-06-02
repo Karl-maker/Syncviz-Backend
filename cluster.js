@@ -58,13 +58,30 @@ require("./helper/db")();
    });
    cluster.fork();
   });
+
+  setInterval(function () {
+   const used = process.memoryUsage();
+
+   const msg = {};
+
+   for (let key in used) {
+    msg[`${key}`] = `${Math.round((used[key] / 1024 / 1024) * 100) / 100} MB`;
+   }
+
+   console.log(msg);
+  }, 10000);
  } else {
   console.log({
    message: `Worker ${process.pid} started`,
    timestamp: new Date().toString(),
   });
 
-  const io = require("socket.io")(server);
+  const io = require("socket.io")(server, {
+   cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+   },
+  });
 
   // use the cluster adapter
 
@@ -77,6 +94,16 @@ require("./helper/db")();
 
   Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
    io.adapter(redis.createAdapter(pubClient, subClient));
+
+   setInterval(
+    () =>
+     console.log({
+      pid: process.pid,
+      connections: io.engine.clientsCount,
+     }),
+    10000
+   );
+
    entryPoint.call({ io });
    io.listen(PORT);
   });
