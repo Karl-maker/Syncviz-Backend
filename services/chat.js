@@ -7,6 +7,7 @@ class Chat {
 
  add(message) {
   this._socket.broadcast.to(this._vs_id).emit("messages", message.get());
+  this._socket.emit("messages", message.get());
  }
 
  direct(message, socket_id) {

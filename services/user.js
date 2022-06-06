@@ -1,7 +1,9 @@
+const colors = ["#00cec9", "#0984e3", "#ff7675", "#6c5ce7"];
+
 class User {
  constructor({ username, color, socket_id }) {
   this._username = username || "";
-  this._color = color || "#0984e3";
+  this._color = color || this.randomizeColor();
   this._socket_id = socket_id || "";
   this._id = "";
  }
@@ -20,6 +22,10 @@ class User {
 
  set username(username) {
   this._username = username;
+ }
+
+ randomizeColor() {
+  return colors[Math.floor(Math.random() * colors.length)];
  }
 
  get() {
