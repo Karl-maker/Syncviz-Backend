@@ -33,9 +33,8 @@ module.exports = virtualSpaceHandler = async (io) => {
   socket.on("disconnect", leaveVirtualSpace);
   socket.on("delete", endVirtualSpace);
   socket.on("send-message", sendMessageToChat);
-  socket.on("send-direct-message", sendDirectMessage);
-  socket.on("send-blob", sendDirectBlob);
-  socket.on("send-direct-blob", sendBlob);
+  socket.on("send-blob", sendBlob);
+  socket.on("send-direct-blob", sendDirectBlob);
   socket.on("speak", sendAudio);
 
   /*
@@ -126,7 +125,7 @@ module.exports = virtualSpaceHandler = async (io) => {
     VirtualSpace.end()
      .then(() =>
       NameSpace.to(VirtualSpace._id).emit("alerts", {
-       message: `Virtual space has closed`,
+       message: `Virtual space was ended by host`,
       })
      )
      .then(() => {
@@ -156,49 +155,26 @@ module.exports = virtualSpaceHandler = async (io) => {
    //}
   }
 
-  function sendDirectMessage({ user_id, message }) {
-   const Message = require("../services/message");
-
-   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
-    ({ users }) => {
-     // check if in viewers list
-
-     users.filter(function (client) {
-      if (client.id === user_id) {
-       VirtualSpace.chat.direct(
-        new Message(message, { sender: VirtualSpace.attendee }),
-        user_id
-       );
-      }
-     });
-    }
-   );
-  }
-
   function sendMessageToChat({ message }) {
    const Message = require("../services/message");
    VirtualSpace.chat.add(
     new Message(message, { sender: VirtualSpace.attendee })
    );
   }
+
+  function sendDirectBlob({ user_id }) {
+   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
+    ({ users }) => {
+     // check if in viewers list
+
+     NameSpace.to(user_id).emit("blobs", VirtualSpace.blob.data);
+    }
+   );
+  }
+
+  function sendBlob(file) {
+   VirtualSpace.blob.data = file;
+   NameSpace.to(VirtualSpace._id).emit("blobs", VirtualSpace.blob.data);
+  }
  });
 };
-
-function sendBlob({ user_id }) {
- VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
-  ({ users }) => {
-   // check if in viewers list
-
-   users.filter(function (client) {
-    if (client.id === user_id) {
-     socket.broadcast.to(user_id).emit("blobs", VirtualSpace.blob.data);
-    }
-   });
-  }
- );
-}
-
-function sendDirectBlob(file) {
- VirtualSpace.blob.data = file;
- socket.broadcast.to(VirtualSpace.id).emit("blobs", VirtualSpace.blob.data);
-}

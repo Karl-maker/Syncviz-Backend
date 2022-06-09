@@ -269,7 +269,7 @@ class VirtualSpace {
    }
 
    if (this._time_limit - minutes === 1) {
-    room.emit("timer", { prompt: "Meeting will end in 1 minute" });
+    room.emit("timer", { prompt: "Virtual Space will end in 1 minute" });
    }
   };
  }
