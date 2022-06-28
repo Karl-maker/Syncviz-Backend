@@ -92,6 +92,7 @@ module.exports = virtualSpaceHandler = async (io) => {
      return { virtual_space };
     })
     .then(({ virtual_space }) => {
+     console.log(virtual_space);
      // Join and Get current viewer's list which should only be the creator
      return VirtualSpace.join(virtual_space._id.toString())
       .then(({ message, virtual_space }) => {
@@ -173,6 +174,7 @@ module.exports = virtualSpaceHandler = async (io) => {
   }
 
   function sendBlob(file) {
+   console.log(file);
    VirtualSpace.blob.data = file;
    NameSpace.to(VirtualSpace._id).emit("blobs", VirtualSpace.blob.data);
   }
