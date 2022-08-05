@@ -4,12 +4,10 @@ module.exports = (req, res, next) => {
  let auth;
 
  try {
-  auth = JSON.parse(req.headers.authorization || '{"username": ""}');
- } catch (err) {
-  console.log(err);
- }
+  auth = JSON.parse(req.headers.authorization);
+ } catch (err) {}
 
- req.user = new User({ username: auth.username || "" });
+ req.user = new User({ username: auth.username, color: auth.theme });
 
  next();
 };

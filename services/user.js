@@ -24,6 +24,14 @@ class User {
   this._username = username;
  }
 
+ get color() {
+  return this._color;
+ }
+
+ set color(color) {
+  this._color = color;
+ }
+
  randomizeColor() {
   return colors[Math.floor(Math.random() * colors.length)];
  }

@@ -22,12 +22,10 @@ function errorHandler(err, socket) {
    case err.code && err.code == 11000:
     return socket.emit("updates", handleDuplicateKeyError(err, res));
    default:
-    console.log(err);
-    return socket.emit("updates", { message: "Unexpected Error" });
+    return console.log(err);
   }
  } catch (e) {
-  console.log(err);
-  return socket.emit("updates", { message: "Unexpected Error" });
+  console.log(e);
  }
 }
 

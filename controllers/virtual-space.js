@@ -2,7 +2,6 @@ const VS = require("../services/virtual-space");
 const wrapper = require("../middlewares/wrapper");
 const constants = require("../constants");
 const config = require("../config");
-const VirtualSpace = require("../services/virtual-space");
 const authenticate = require("../middlewares/authenticate");
 const errorHandler = require("../utils/socket-error-handler");
 
@@ -12,7 +11,7 @@ module.exports = virtualSpaceHandler = async (io) => {
  NameSpace.use(wrapper(authenticate));
 
  NameSpace.on("connection", async (socket) => {
-  const VirtualSpace = new VS({});
+  const VirtualSpace = new VS();
   const User = socket.request.user;
 
   // Actions when user connects to ns
@@ -30,12 +29,11 @@ module.exports = virtualSpaceHandler = async (io) => {
 
   socket.on("join", joinVirtualSpace);
   socket.on("create", createVirtualSpace);
+  socket.on("attributes", updateAttributes);
   socket.on("disconnect", leaveVirtualSpace);
   socket.on("delete", endVirtualSpace);
   socket.on("send-message", sendMessageToChat);
-  socket.on("send-blob", sendBlob);
-  socket.on("send-direct-blob", sendDirectBlob);
-  socket.on("speak", sendAudio);
+  socket.on("update-user", updateUserDetails);
 
   /*
 
@@ -44,18 +42,12 @@ module.exports = virtualSpaceHandler = async (io) => {
   1. updates - general updates e.g. when users join
   2. alerts - major alerts
   3. messages / private-messages - messages
-  4. live-audios - live audio data
-  5. blobs - blob data (imgs, 3d, video)
-  6. viewers - viewers attending virtual space 
-  7. attributes - virtual space attributes
-  8. timer - time limit
-  9. me - my data
+  4. viewers - viewers attending virtual space 
+  5. attributes - virtual space attributes
+  6. timer - time limit
+  7. me - my data
 
   */
-
-  function sendAudio(audio) {
-   socket.broadcast.to(VirtualSpace.id).emit("live-audios", audio);
-  }
 
   function joinVirtualSpace() {
    virtual_space_id = socket.handshake.query.virtual_space_id;
@@ -84,15 +76,19 @@ module.exports = virtualSpaceHandler = async (io) => {
     });
   }
 
-  function createVirtualSpace({ name, description }) {
-   VirtualSpace.create({ creator_id: socket.id, name, description })
+  function createVirtualSpace({ description }) {
+   VirtualSpace.create({
+    creator_id: socket.id,
+    description,
+    username: VirtualSpace.attendee.username,
+    user_theme: VirtualSpace.attendee.color,
+   })
     .then(({ message, virtual_space }) => {
      // Prompt creator
      socket.emit("alerts", { message });
      return { virtual_space };
     })
     .then(({ virtual_space }) => {
-     console.log(virtual_space);
      // Join and Get current viewer's list which should only be the creator
      return VirtualSpace.join(virtual_space._id.toString())
       .then(({ message, virtual_space }) => {
@@ -126,7 +122,7 @@ module.exports = virtualSpaceHandler = async (io) => {
     VirtualSpace.end()
      .then(() =>
       NameSpace.to(VirtualSpace._id).emit("alerts", {
-       message: `Virtual space was ended by host`,
+       message: `Metaverse room was ended by host`,
       })
      )
      .then(() => {
@@ -148,12 +144,10 @@ module.exports = virtualSpaceHandler = async (io) => {
      socket.broadcast.to(VirtualSpace.id).emit("updates", {
       message: `${VirtualSpace.attendee.username} has left`,
      });
-     if (socket.id !== VirtualSpace.creator_id) {
-      socket.disconnect(true);
-     }
+
+     endVirtualSpace();
     })
     .catch((err) => errorHandler(err, socket));
-   //}
   }
 
   function sendMessageToChat({ message }) {
@@ -163,20 +157,33 @@ module.exports = virtualSpaceHandler = async (io) => {
    );
   }
 
-  function sendDirectBlob({ user_id }) {
-   VirtualSpace.getSocketClients(NameSpace.in(VirtualSpace._id)).then(
-    ({ users }) => {
-     // check if in viewers list
-
-     NameSpace.to(user_id).emit("blobs", VirtualSpace.blob.data);
-    }
-   );
+  function updateAttributes({ description }) {
+   if (User.socket_id === VirtualSpace.creator_id) {
+    VirtualSpace.updateAttributes({ description })
+     .then((virtual_space) => {
+      // Others
+      NameSpace.to(VirtualSpace._id).emit("alerts", {
+       message: "Metaverse caption has changed",
+       type: "info",
+      });
+      NameSpace.to(VirtualSpace._id).emit("attributes", { virtual_space });
+     })
+     .catch((err) => errorHandler(err, socket));
+   }
   }
 
-  function sendBlob(file) {
-   console.log(file);
-   VirtualSpace.blob.data = file;
-   NameSpace.to(VirtualSpace._id).emit("blobs", VirtualSpace.blob.data);
+  function updateUserDetails({ username, theme }) {
+   if (username !== VirtualSpace.attendee.username) {
+    let current_username = VirtualSpace.attendee.username;
+    VirtualSpace.attendee.username = username;
+    NameSpace.to(VirtualSpace._id).emit("updates", {
+     message: `${current_username} has changed their username to ${VirtualSpace.attendee.username}`,
+    });
+   }
+
+   if (theme) {
+    VirtualSpace.attendee.color = theme;
+   }
   }
  });
 };

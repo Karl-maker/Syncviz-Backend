@@ -1,5 +1,6 @@
 module.exports = {
-  namespaces: {
-    VIRTUAL_SPACE: "/virtual-space",
-  },
+ namespaces: {
+  VIRTUAL_SPACE: "/virtual-space",
+  METAVERSE_ROOM: "/metaverse-room",
+ },
 };

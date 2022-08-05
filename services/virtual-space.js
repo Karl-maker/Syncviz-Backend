@@ -2,33 +2,13 @@ const User = require("./user");
 const Chat = require("./chat");
 const { fetchSocketOrganizer } = require("../utils/socket");
 const VirtualSpaceModel = require("../models/virtual-space");
-const Blob = require("./blob");
-const schedule = require("node-schedule");
 const constants = require("../constants");
 
 class VirtualSpace {
- constructor({
-  id,
-  name,
-  description,
-  host,
-  time_limit,
-  attendant_limit,
-  attendee,
-  vs,
-  socket,
- }) {
-  this._id = id || "";
-  this._name = name || "";
-  this._description = description || "";
-  this._time_limit = time_limit || 30;
-  this._attendant_limit = attendant_limit || 5;
-  this._creator_id = "";
-  this._attendee = attendee || new User({});
-  this._chat = null;
-  this._blob = new Blob({});
+ constructor() {
+  this._time_limit = 30;
   this._master = false;
-  this._io = null;
+  this._url = null;
  }
 
  // Getters and Setters
@@ -49,14 +29,6 @@ class VirtualSpace {
   this._creator_id = creator_id;
  }
 
- get name() {
-  return this._name;
- }
-
- set name(name) {
-  this._name = name;
- }
-
  get description() {
   return this._description;
  }
@@ -65,12 +37,12 @@ class VirtualSpace {
   this._description = description;
  }
 
- get vs() {
-  return this._vs;
+ get url() {
+  return this._url;
  }
 
- set vs(vs) {
-  this._vs = vs;
+ set url(url) {
+  this._url = url;
  }
 
  get socket() {
@@ -97,28 +69,12 @@ class VirtualSpace {
   this._chat = chat;
  }
 
- get blob() {
-  return this._blob;
- }
-
- set blob(blob) {
-  this._blob = blob;
- }
-
  get master() {
   return this._master;
  }
 
  set master(master) {
   this._master = master;
- }
-
- get io() {
-  return this._io;
- }
-
- set io(io) {
-  this._io = io;
  }
 
  async join(id) {
@@ -135,36 +91,30 @@ class VirtualSpace {
   // Check if exists
 
   if (!virtual_space) {
-   throw { name: "NotFound", message: "Virtual space isn't found" };
+   throw { name: "NotFound", message: "Metaverse room isn't found" };
   }
 
-  if (virtual_space.current_amount_attending < virtual_space.attendant_limit) {
-   // Socket operations
-   this._id = id;
-   this._name = virtual_space.name;
-   this._description = virtual_space.description;
-   this._time_limit = virtual_space.time_limit;
-   this._creator_id == virtual_space.host;
+  // Socket operations
+  this._id = id;
+  this._description = virtual_space.description;
+  this._time_limit = virtual_space.time_limit;
+  this._creator_id = virtual_space.host;
+  this._url = virtual_space.url;
 
-   this._socket.join(id);
+  this._socket.join(id);
 
-   virtual_space = await VirtualSpaceModel.findOneAndUpdate(
-    { _id: id },
-    { $inc: { current_amount_attending: 1 } },
-    { new: true }
-   );
+  virtual_space = await VirtualSpaceModel.findOneAndUpdate(
+   { _id: id },
+   { $inc: { current_amount_attending: 1 } },
+   { new: true }
+  );
 
-   // Initialize Chat
+  // Initialize Chat
 
-   this.initializeChat();
+  this.initializeChat();
 
-   return { message: "Joined Virtual Space", virtual_space };
-  } else {
-   throw { name: "Forbidden", message: "Virtual Space is full" };
-  }
+  return { message: "Joined Metaverse Room", virtual_space };
  }
-
- async kick(user_id) {}
 
  async getSocketClients(room) {
   let result = fetchSocketOrganizer(await room.fetchSockets());
@@ -190,45 +140,48 @@ class VirtualSpace {
  async fetch() {
   this._socket.emit("attributes", {
    id: this._id,
-   name: this._name,
    description: this._description,
+   url: this._url,
   });
  }
 
- async delete() {
-  // If the creator leaves..
-  this._vs.disconnectSockets();
+ async updateAttributes({ description }) {
+  try {
+   const new_virtualspace = await VirtualSpaceModel.findOneAndUpdate(
+    { _id: this._id },
+    { description },
+    { new: true }
+   );
+
+   this._description = new_virtualspace.description;
+   return new_virtualspace;
+  } catch (err) {
+   throw { err };
+  }
  }
 
- async create({ creator_id, name, description }) {
+ async create({ creator_id, description, username, user_theme }) {
   // Creation Logic
   try {
    let virtual_space = await VirtualSpaceModel.create({
     host: creator_id,
-    name,
+    user: { username, theme: user_theme },
     description,
    });
 
-   this._name = virtual_space.name;
    this._description = virtual_space.description;
    this._creator_id = creator_id;
    this._time_limit = virtual_space.time_limit;
    this._master = true;
+   this._url = virtual_space.url;
 
    return {
-    message: "Virtual Space created",
+    message: "Metaverse room created",
     virtual_space: virtual_space,
    };
   } catch (err) {
    throw err;
   }
- }
-
- initializeChat() {
-  this._chat = new Chat({
-   vs_id: this._id,
-   socket: this._socket,
-  });
  }
 
  async time(room) {
@@ -240,22 +193,13 @@ class VirtualSpace {
   }, 60000);
 
   const trackTimer = (minutes) => {
-   if (minutes < this._time_limit) {
-    // running
-    room.emit("timer", {
-     time_left: `${this._time_limit - minutes} ${
-      this._time_limit - minutes === 1 ? "minute" : "minutes"
-     }`,
-    });
-   }
-
    if (minutes >= this._time_limit) {
     // finished
 
     this.end()
      .then(() =>
       room.emit("alerts", {
-       message: `Virtual space has closed`,
+       message: `Metaverse room has closed`,
       })
      )
      .then(() => {
@@ -267,11 +211,14 @@ class VirtualSpace {
       throw err;
      });
    }
-
-   if (this._time_limit - minutes === 1) {
-    room.emit("timer", { prompt: "Virtual Space will end in 1 minute" });
-   }
   };
+ }
+
+ initializeChat() {
+  this._chat = new Chat({
+   vs_id: this._id,
+   socket: this._socket,
+  });
  }
 }
 

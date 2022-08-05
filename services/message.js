@@ -9,7 +9,11 @@ class Message {
   return {
    message: this._message,
    timestamp: this._timestamp,
-   sender: { username: this._sender.username, id: this._sender.socket_id },
+   sender: {
+    username: this._sender.username,
+    id: this._sender.socket_id,
+    color: this._sender.color,
+   },
   };
  }
 }
