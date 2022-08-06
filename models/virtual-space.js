@@ -15,7 +15,7 @@ const VirtualSpaceSchema = new mongoose.Schema(
   url: {
    type: String,
    default:
-    "http://192.168.0.6:7000/static/uploads_files_3285656_buildings.glb",
+    "http://192.168.0.6:7000/static/uploads_files_3701280_A+miniature+model+of+the+city.glb",
    //"https://assets.babylonjs.com/meshes/LevelOfDetail.glb",
   },
   user: {},
